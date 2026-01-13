@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Girne Koleji 3D - Kalkan Gücü</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        
+        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; display: none; }
+        #bars { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        
+        /* Bar Tasarımları */
+        .bar-container { width: 250px; text-align: left; }
+        .label { font-size: 10px; margin-bottom: 2px; letter-spacing: 1px; }
+        .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 10px; border: 1.5px solid #444; overflow: hidden; }
+        
+        #stamina-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #00d2ff, #0055ff); transition: width 0.1s linear; }
+        
+        /* Kalkan Barı Özel Tasarım */
+        #shield-ui { display: none; }
+        #shield-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #00ffff, #008888); box-shadow: 0 0 10px #00ffff; }
+        
+        #status-msg { font-size: 24px; font-weight: bold; margin-top: 15px; color: #ff0000; text-shadow: 0 0 10px #000; min-height: 35px; }
+        #signature { position: fixed; bottom: 5px; right: 10px; color: rgba(255, 255, 255, 0.4); font-family: monospace; font-size: 11px; z-index: 100; pointer-events: none; }
+
+        #pause-btn { position: fixed; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.15); border: 1.5px solid rgba(255, 255, 255, 0.4); color: white; padding: 8px 15px; border-radius: 8px; font-size: 14px; cursor: pointer; z-index: 50; display: none; backdrop-filter: blur(5px); }
+
+        #mobile-controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 50; }
+        .m-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; user-select: none; }
+        #sprint-btn { width: 85px; height: 85px; background: rgba(255, 0, 85, 0.2); border-color: rgba(255, 0, 85, 0.5); font-size: 14px; font-weight: bold; }
+
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: white; text-align: center; }
+        .diff-btn { padding: 12px 35px; font-size: 1rem; border: none; cursor: pointer; border-radius: 8px; margin: 8px; font-weight: bold; width: 180px; color: white; }
+        .btn-easy { background: #2ecc71; } .btn-medium { background: #f1c40f; color: black; } .btn-hard { background: #e74c3c; }
+        .reset-btn { background: #00d2ff; color: black; border-radius: 50px; padding: 15px 40px; font-size: 1.2rem; margin-top: 20px; border: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="signature">BY THE BERKE ÖZGER</div>
+<div id="pause-btn" onclick="togglePause()">DURDUR ||</div>
+
+<div id="ui">
+    <div style="font-size: 20px; margin-bottom: 10px;">PUAN: <span id="score-val">0</span></div>
+    <div id="bars">
+        <div class="bar-container">
+            <div class="label">DEPAR (SHIFT)</div>
+            <div class="bar-bg"><div id="stamina-bar"></div></div>
+        </div>
+        <div class="bar-container" id="shield-ui">
+            <div class="label" style="color: #00ffff;">KALKAN SÜRESİ 🛡️</div>
+            <div class="bar-bg" style="border-color: #00ffff;"><div id="shield-bar"></div></div>
+        </div>
+    </div>
+    <div id="status-msg"></div>
+</div>
+
+<div id="mobile-controls" style="display: none;">
+    <div style="display: flex; gap: 15px;">
+        <div class="m-btn" ontouchstart="moveLeft()">←</div>
+        <div class="m-btn" ontouchstart="moveRight()">→</div>
+    </div>
+    <div class="m-btn" id="sprint-btn" ontouchstart="startSprint()" ontouchend="stopSprint()">DEPAR</div>
+</div>
+
+<div id="start-screen" class="overlay">
+    <h1 style="color: #00d2ff;">GİRNE KOLEJİ 3D</h1>
+    <p>Kalkan 10 saniye korur! Kediden korkma.</p>
+    <button class="diff-btn btn-easy" onclick="startGame('easy')">KOLAY</button>
+    <button class="diff-btn btn-medium" onclick="startGame('medium')">ORTA</button>
+    <button class="diff-btn btn-hard" onclick="startGame('hard')">ZOR</button>
+</div>
+
+<div id="pause-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.8);">
+    <h1>OYUN DURDU</h1>
+    <button class="reset-btn" onclick="togglePause()">DEVAM ET</button>
+</div>
+
+<div id="game-over-screen" class="overlay" style="display: none;">
+    <h1 id="death-reason" style="color: #ff3333;">YAKALANDIN!</h1>
+    <button class="reset-btn" onclick="resetGame()">TEKRAR DENE</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    let scene, camera, renderer, player, animationId, spawnTimer, catTimeout;
+    let obstacles = [], books = [], shields = [];
+    let score = 0, gameActive = false, isPaused = false;
+    
+    let difficulty = 'medium';
+    let baseSpeed = 0.5;
+    let spawnRate = 800;
+    let obstacleChance = 0.6; 
+
+    let stamina = 100; 
+    let isSprinting = false; 
+    
+    // Kalkan Sistemi
+    let isShielded = false;
+    let shieldTimeLeft = 0;
+    const SHIELD_DURATION = 10; // 10 saniye
+
+    let kediActive = false;
+    let chaseTimeNeeded = 3.0;
+    let kediGrup, shieldOrb;
+
+    function moveLeft() { if(gameActive && !isPaused && player.position.x > -2) player.position.x -= 2; }
+    function moveRight() { if(gameActive && !isPaused && player.position.x < 2) player.position.x += 2; }
+    function startSprint() { if(gameActive && !isPaused) isSprinting = true; }
+    function stopSprint() { isSprinting = false; }
+
+    function togglePause() {
+        if (!gameActive) return;
+        isPaused = !isPaused;
+        if (isPaused) {
+            cancelAnimationFrame(animationId);
+            clearTimeout(spawnTimer);
+            document.getElementById('pause-screen').style.display = 'flex';
+        } else {
+            document.getElementById('pause-screen').style.display = 'none';
+            spawn(); animate();
+        }
+    }
+
+    function init() {
+        if (renderer) return;
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.Fog(0x020205, 10, 75);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 4, 10);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        scene.add(new THREE.GridHelper(200, 40, 0x00d2ff, 0x222222));
+
+        player = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0x00d2ff }));
+        player.position.y = 0.5;
+        scene.add(player);
+
+        shieldOrb = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 24), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.5 }));
+        shieldOrb.visible = false;
+        player.add(shieldOrb);
+
+        kediGrup = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+        eye.position.set(0.7, 0.6, 1.0); const eye2 = eye.clone(); eye2.position.x = -0.7;
+        kediGrup.add(body, eye, eye2);
+        kediGrup.visible = false;
+        scene.add(kediGrup);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Escape") togglePause();
+            if (!gameActive || isPaused) return;
+            if (e.key === "a" || e.key === "ArrowLeft") moveLeft();
+            if (e.key === "d" || e.key === "ArrowRight") moveRight();
+            if (e.key === "Shift") startSprint();
+        });
+        window.addEventListener('keyup', (e) => { if (e.key === "Shift") stopSprint(); });
+    }
+
+    function activateShield() {
+        isShielded = true;
+        shieldTimeLeft = SHIELD_DURATION;
+        shieldOrb.visible = true;
+        document.getElementById('shield-ui').style.display = 'block';
+    }
+
+    function startGame(selectedDiff) {
+        init();
+        difficulty = selectedDiff;
+        isPaused = false;
+        if (difficulty === 'easy') { baseSpeed = 0.35; spawnRate = 1200; obstacleChance = 0.4; }
+        else if (difficulty === 'medium') { baseSpeed = 0.55; spawnRate = 800; obstacleChance = 0.65; }
+        else if (difficulty === 'hard') { baseSpeed = 0.85; spawnRate = 500; obstacleChance = 0.85; }
+
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        document.getElementById('mobile-controls').style.display = 'flex';
+        document.getElementById('pause-btn').style.display = 'block';
+        
+        score = 0; stamina = 100; shieldTimeLeft = 0; isShielded = false;
+        gameActive = true; kediActive = false; kediGrup.visible = false; shieldOrb.visible = false;
+        
+        spawn(); animate(); scheduleNextCat(); 
+    }
+
+    function animate() {
+        if (!gameActive || isPaused) return;
+        animationId = requestAnimationFrame(animate);
+
+        camera.position.x += (player.position.x - camera.position.x) * 0.1;
+        camera.lookAt(player.position.x, 1, player.position.z - 5);
+
+        let currentSpeed = baseSpeed;
+
+        // Stamina/Depar
+        if (isSprinting && stamina > 0) {
+            currentSpeed = baseSpeed * 1.5; stamina -= 0.16;
+            if (kediActive) chaseTimeNeeded -= 0.016; 
+        } else {
+            if (stamina < 100) stamina += 0.1;
+            isSprinting = false;
+        }
+        document.getElementById('stamina-bar').style.width = stamina + "%";
+
+        // Kalkan Barı Güncelleme
+        if (isShielded) {
+            shieldTimeLeft -= 0.016; // Yaklaşık saniyede 1 düşer (60fps)
+            document.getElementById('shield-bar').style.width = (shieldTimeLeft / SHIELD_DURATION * 100) + "%";
+            shieldOrb.rotation.y += 0.05;
+            
+            if (shieldTimeLeft <= 0) {
+                isShielded = false;
+                shieldOrb.visible = false;
+                document.getElementById('shield-ui').style.display = 'none';
+            }
+        }
+
+        // Kedi Mantığı
+        if (kediActive) {
+            document.getElementById('status-msg').innerText = "DEPAR: " + Math.max(0, chaseTimeNeeded).toFixed(1) + "s";
+            kediGrup.position.x += (player.position.x - kediGrup.position.x) * 0.1;
+
+            if (isSprinting) kediGrup.position.z += 0.2; 
+            else kediGrup.position.z -= 0.035; 
+
+            if (kediGrup.position.z > 20) kediGrup.position.z = 20;
+
+            if (chaseTimeNeeded <= 0) {
+                kediActive = false; kediGrup.visible = false;
+                document.getElementById('status-msg').innerText = "KURTULDUN!";
+                setTimeout(() => { if(gameActive) document.getElementById('status-msg').innerText = ""; }, 2000);
+                scheduleNextCat(); 
+            }
+
+            // ÇARPIŞMA: Eğer kalkan yoksa öl, kalkan varsa kedi seni öldüremez
+            if (kediGrup.position.z < 1.2) {
+                if (!isShielded) {
+                    gameOver("KEDİ YAKALADI!");
+                } else {
+                    // Kalkan varken kedi itilsin ki iç içe geçmesin
+                    kediGrup.position.z = 3.0; 
+                }
+            }
+        }
+
+        // Objeler
+        [obstacles, books, shields].forEach((arr, type) => {
+            for (let i = arr.length - 1; i >= 0; i--) {
+                arr[i].position.z += currentSpeed;
+                if (Math.abs(arr[i].position.z - player.position.z) < 0.8 && Math.abs(arr[i].position.x - player.position.x) < 0.8) {
+                    if (type === 0) { // Engel
+                        if (!isShielded) gameOver("ENGELE ÇARPTIN!"); 
+                        else { scene.remove(arr[i]); arr.splice(i, 1); } // Kalkan engeli yok eder
+                    } 
+                    else if (type === 1) { score += 100; scene.remove(arr[i]); arr.splice(i, 1); } 
+                    else if (type === 2) { activateShield(); scene.remove(arr[i]); arr.splice(i, 1); } 
+                } 
+                else if (arr[i].position.z > 15) { scene.remove(arr[i]); arr.splice(i, 1); }
+            }
+        });
+
+        document.getElementById('score-val').innerText = score;
+        renderer.render(scene, camera);
+    }
+
+    function scheduleNextCat() {
+        if (!gameActive) return;
+        catTimeout = setTimeout(() => {
+            if (gameActive && !isPaused) {
+                document.getElementById('status-msg').innerText = "KEDİ ARKANDA!";
+                setTimeout(() => { if(gameActive && !isPaused) activateKedi(); }, 1500);
+            } else if (isPaused) scheduleNextCat();
+        }, Math.random() * 15000 + 10000);
+    }
+
+    function activateKedi() { kediActive = true; chaseTimeNeeded = 3.0; kediGrup.visible = true; kediGrup.position.set(player.position.x, 0, 8); }
+
+    function spawn() {
+        if (!gameActive || isPaused) return;
+        let lane = (Math.floor(Math.random() * 3) - 1) * 2;
+        let r = Math.random();
+        if (r > (1.0 - obstacleChance)) { 
+            let obs = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1), new THREE.MeshPhongMaterial({ color: 0xff0055 }));
+            obs.position.set(lane, 0.5, -60); scene.add(obs); obstacles.push(obs);
+        } else if (r > 0.15) { 
+            let b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshPhongMaterial({ color: 0xf1c40f }));
+            b.position.set(lane, 0.5, -60); scene.add(b); books.push(b);
+        } else {
+            let s = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x00ffff }));
+            s.position.set(lane, 0.6, -60); scene.add(s); shields.push(s);
+        }
+        spawnTimer = setTimeout(spawn, spawnRate);
+    }
+
+    function gameOver(reason) {
+        gameActive = false; cancelAnimationFrame(animationId); clearTimeout(spawnTimer); clearTimeout(catTimeout);
+        document.getElementById('ui').style.display = 'none'; document.getElementById('mobile-controls').style.display = 'none';
+        document.getElementById('pause-btn').style.display = 'none'; document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('death-reason').innerText = reason;
+    }
+
+    function resetGame() {
+        [obstacles, books, shields].forEach(arr => { arr.forEach(obj => scene.remove(obj)); });
+        obstacles = []; books = []; shields = [];
+        document.getElementById('game-over-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+        document.getElementById('status-msg').innerText = "";
+    }
+</script>
+</body>
+</html>
