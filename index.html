@@ -3,316 +3,466 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Girne Koleji 3D - Kalkan Gücü</title>
+    <title>Girne Koleji 3D: Orjinal Voxel</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Arial Black', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
         
-        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; display: none; }
-        #bars { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        /* --- ARAYÜZ (HUD) --- */
+        #ui-layer { position: absolute; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
         
-        /* Bar Tasarımları */
-        .bar-container { width: 250px; text-align: left; }
-        .label { font-size: 10px; margin-bottom: 2px; letter-spacing: 1px; }
-        .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 10px; border: 1.5px solid #444; overflow: hidden; }
+        #score-box { position: absolute; top: 15px; width: 100%; text-align: center; color: white; font-size: 45px; font-weight: bold; text-shadow: 0 0 10px #00d2ff; }
+        #coin-box { position: absolute; top: 20px; right: 20px; color: #ffd700; font-size: 24px; text-shadow: 2px 2px 0 #000; }
         
-        #stamina-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #00d2ff, #0055ff); transition: width 0.1s linear; }
-        
-        /* Kalkan Barı Özel Tasarım */
-        #shield-ui { display: none; }
-        #shield-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #00ffff, #008888); box-shadow: 0 0 10px #00ffff; }
-        
-        #status-msg { font-size: 24px; font-weight: bold; margin-top: 15px; color: #ff0000; text-shadow: 0 0 10px #000; min-height: 35px; }
-        #signature { position: fixed; bottom: 5px; right: 10px; color: rgba(255, 255, 255, 0.4); font-family: monospace; font-size: 11px; z-index: 100; pointer-events: none; }
+        /* UYARILAR */
+        #pre-chase-warning {
+            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff5500; font-size: 40px; text-align: center; font-weight: bold;
+            display: none; text-shadow: 0 0 20px orange; animation: blink 0.5s infinite;
+        }
+        #chase-alert { 
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 60px; text-align: center; font-weight: bold;
+            display: none; text-shadow: 0 0 20px red;
+        }
+        .alert-safe { color: #00ff00; } 
+        .alert-danger { color: #ff0000; animation: shake 0.1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+        @keyframes shake { 0% { transform: translate(-52%, -50%); } 50% { transform: translate(-48%, -50%); } 100% { transform: translate(-52%, -50%); } }
 
-        #pause-btn { position: fixed; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.15); border: 1.5px solid rgba(255, 255, 255, 0.4); color: white; padding: 8px 15px; border-radius: 8px; font-size: 14px; cursor: pointer; z-index: 50; display: none; backdrop-filter: blur(5px); }
+        /* BARLAR (Enerji ve Kalkan) */
+        .bar-container { position: absolute; left: 50%; transform: translateX(-50%); width: 300px; height: 15px; border: 2px solid white; border-radius: 5px; overflow: hidden; }
+        #stamina-bar { top: 80px; background: #222; }
+        #stamina-fill { width: 100%; height: 100%; background: #00ff00; transition: width 0.1s; }
+        
+        #shield-bar { top: 105px; background: #002244; display: none; border-color: #00ffff; }
+        #shield-fill { width: 100%; height: 100%; background: #00ffff; box-shadow: 0 0 10px #00ffff; transition: width 0.1s; }
+        #shield-text { position: absolute; top: 105px; left: 50%; transform: translateX(-50%); color: cyan; font-size: 10px; font-weight: bold; display: none; text-shadow: 0 0 2px black; }
 
-        #mobile-controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 50; }
-        .m-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; user-select: none; }
-        #sprint-btn { width: 85px; height: 85px; background: rgba(255, 0, 85, 0.2); border-color: rgba(255, 0, 85, 0.5); font-size: 14px; font-weight: bold; }
+        /* GÜÇ BUTONLARI (Sağ Alt) */
+        #powers { position: absolute; right: 20px; bottom: 140px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
+        .p-btn { width: 70px; height: 70px; border-radius: 10px; border: 2px solid white; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px; background: rgba(0,0,0,0.6); cursor: pointer; position: relative; }
+        .p-count { position: absolute; top: -8px; right: -8px; background: red; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; }
 
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: white; text-align: center; }
-        .diff-btn { padding: 12px 35px; font-size: 1rem; border: none; cursor: pointer; border-radius: 8px; margin: 8px; font-weight: bold; width: 180px; color: white; }
-        .btn-easy { background: #2ecc71; } .btn-medium { background: #f1c40f; color: black; } .btn-hard { background: #e74c3c; }
-        .reset-btn { background: #00d2ff; color: black; border-radius: 50px; padding: 15px 40px; font-size: 1.2rem; margin-top: 20px; border: none; font-weight: bold; }
+        /* MOBİL KONTROL */
+        #mobile-controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; pointer-events: auto; z-index: 100; display: none; }
+        .ctrl-btn { width: 90px; height: 90px; background: rgba(255,255,255,0.15); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; backdrop-filter: blur(5px); }
+        #sprint-btn { width: 110px; border-radius: 20px; font-size: 18px; background: rgba(255, 69, 0, 0.6); font-weight: bold; }
+
+        /* MENÜLER (Başlangıç, Market, Pause, Game Over) */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.96); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; color: white; }
+        .btn { padding: 15px 40px; font-size: 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; width: 280px; font-weight: bold; color: white; pointer-events: auto; transition: 0.1s; }
+        .btn:active { transform: scale(0.95); }
+
+        #pause-btn { position: fixed; top: 20px; left: 20px; padding: 10px 20px; background: rgba(255,255,255,0.2); border: 2px solid white; color: white; border-radius: 5px; cursor: pointer; pointer-events: auto; z-index: 150; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="signature">BY THE BERKE ÖZGER</div>
-<div id="pause-btn" onclick="togglePause()">DURDUR ||</div>
+<div id="ui-layer">
+    <div id="score-box">0</div>
+    <div id="coin-box">🪙 <span id="coin-display">0</span></div>
+    
+    <div id="stamina-bar" class="bar-container"><div id="stamina-fill"></div></div>
+    <div id="shield-bar" class="bar-container"><div id="shield-fill"></div></div>
+    <div id="shield-text">KALKAN AKTİF</div>
 
-<div id="ui">
-    <div style="font-size: 20px; margin-bottom: 10px;">PUAN: <span id="score-val">0</span></div>
-    <div id="bars">
-        <div class="bar-container">
-            <div class="label">DEPAR (SHIFT)</div>
-            <div class="bar-bg"><div id="stamina-bar"></div></div>
+    <div id="pre-chase-warning">DİKKAT!<br>KEDİ GELİYOR!<br><span id="pre-timer">3.0</span></div>
+    <div id="chase-alert">KOŞ!<br><span id="survival-timer">3.0</span></div>
+    
+    <div id="powers">
+        <div class="p-btn" style="background: #3498db;" onclick="useItem('freeze')">
+            DONDUR<br>(Z)
+            <div class="p-count" id="badge-freeze">0</div>
         </div>
-        <div class="bar-container" id="shield-ui">
-            <div class="label" style="color: #00ffff;">KALKAN SÜRESİ 🛡️</div>
-            <div class="bar-bg" style="border-color: #00ffff;"><div id="shield-bar"></div></div>
+        <div class="p-btn" style="background: #e67e22;" onclick="useItem('shield')">
+            KALKAN<br>(X)
+            <div class="p-count" id="badge-shield">0</div>
         </div>
     </div>
-    <div id="status-msg"></div>
 </div>
 
-<div id="mobile-controls" style="display: none;">
-    <div style="display: flex; gap: 15px;">
-        <div class="m-btn" ontouchstart="moveLeft()">←</div>
-        <div class="m-btn" ontouchstart="moveRight()">→</div>
+<div id="mobile-controls">
+    <div style="display: flex; gap: 20px;">
+        <div class="ctrl-btn" id="m-left">←</div>
+        <div class="ctrl-btn" id="m-right">→</div>
     </div>
-    <div class="m-btn" id="sprint-btn" ontouchstart="startSprint()" ontouchend="stopSprint()">DEPAR</div>
+    <div class="ctrl-btn" id="sprint-btn">DEPAR</div>
 </div>
+
+<div id="pause-btn" onclick="togglePause()">DURDUR</div>
 
 <div id="start-screen" class="overlay">
-    <h1 style="color: #00d2ff;">GİRNE KOLEJİ 3D</h1>
-    <p>Kalkan 10 saniye korur! Kediden korkma.</p>
-    <button class="diff-btn btn-easy" onclick="startGame('easy')">KOLAY</button>
-    <button class="diff-btn btn-medium" onclick="startGame('medium')">ORTA</button>
-    <button class="diff-btn btn-hard" onclick="startGame('hard')">ZOR</button>
+    <h1 style="color: #00d2ff; font-size: 45px; text-shadow: 0 0 10px cyan;">GİRNE KOLEJİ 3D</h1>
+    <p>Coin: <span id="menu-coin">0</span></p>
+    <p style="font-size:12px; color:#aaa;">(Ses için ekrana tıklayın)</p>
+    <button class="btn" style="background: #27ae60;" onclick="startGame('easy')">KOLAY</button>
+    <button class="btn" style="background: #f39c12; color: black;" onclick="startGame('medium')">ORTA</button>
+    <button class="btn" style="background: #c0392b;" onclick="startGame('hard')">ZOR</button>
+    <button class="btn" style="background: #8e44ad;" onclick="openShop()">MARKET 🛒</button>
 </div>
 
-<div id="pause-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.8);">
-    <h1>OYUN DURDU</h1>
-    <button class="reset-btn" onclick="togglePause()">DEVAM ET</button>
+<div id="shop-screen" class="overlay" style="display: none;">
+    <h1 style="color: #f1c40f;">MARKET</h1>
+    <p>Bakiye: <span id="shop-coin">0</span> 🪙</p>
+    <button class="btn" style="background: #e67e22;" onclick="buy('mult')">+1x Çarpan (500)</button>
+    <button class="btn" style="background: #3498db;" onclick="buy('freeze')">Dondurucu (200)</button>
+    <button class="btn" style="background: #8e44ad;" onclick="buy('shield')">Süper Kalkan (1000)</button>
+    <button class="btn" style="background: #555;" onclick="closeShop()">KAPAT</button>
 </div>
 
-<div id="game-over-screen" class="overlay" style="display: none;">
-    <h1 id="death-reason" style="color: #ff3333;">YAKALANDIN!</h1>
-    <button class="reset-btn" onclick="resetGame()">TEKRAR DENE</button>
+<div id="pause-screen" class="overlay" style="display: none;">
+    <h1>DURAKLATILDI</h1>
+    <button class="btn" style="background: #3498db;" onclick="togglePause()">DEVAM ET</button>
+    <button class="btn" style="background: #c0392b;" onclick="hardReload()">MENÜYE DÖN</button>
+</div>
+
+<div id="game-over" class="overlay" style="display: none;">
+    <h1 style="color: red; font-size: 60px;">YAKALANDIN!</h1>
+    <h2 id="final-score">Skor: 0</h2>
+    <button class="btn" style="background: #27ae60;" onclick="hardReload()">TEKRAR OYNA</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
-    let scene, camera, renderer, player, animationId, spawnTimer, catTimeout;
-    let obstacles = [], books = [], shields = [];
-    let score = 0, gameActive = false, isPaused = false;
-    
-    let difficulty = 'medium';
-    let baseSpeed = 0.5;
-    let spawnRate = 800;
-    let obstacleChance = 0.6; 
+    // --- SES SİSTEMİ (Web Audio API) ---
+    let audioCtx;
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+    }
 
-    let stamina = 100; 
-    let isSprinting = false; 
-    
-    // Kalkan Sistemi
-    let isShielded = false;
-    let shieldTimeLeft = 0;
-    const SHIELD_DURATION = 10; // 10 saniye
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
 
-    let kediActive = false;
-    let chaseTimeNeeded = 3.0;
-    let kediGrup, shieldOrb;
-
-    function moveLeft() { if(gameActive && !isPaused && player.position.x > -2) player.position.x -= 2; }
-    function moveRight() { if(gameActive && !isPaused && player.position.x < 2) player.position.x += 2; }
-    function startSprint() { if(gameActive && !isPaused) isSprinting = true; }
-    function stopSprint() { isSprinting = false; }
-
-    function togglePause() {
-        if (!gameActive) return;
-        isPaused = !isPaused;
-        if (isPaused) {
-            cancelAnimationFrame(animationId);
-            clearTimeout(spawnTimer);
-            document.getElementById('pause-screen').style.display = 'flex';
-        } else {
-            document.getElementById('pause-screen').style.display = 'none';
-            spawn(); animate();
+        if (type === 'coin') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now); osc.frequency.exponentialRampToValueAtTime(2000, now + 0.1);
+            gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'hit') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+            gain.gain.setValueAtTime(0.5, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now); osc.stop(now + 0.3);
+        } else if (type === 'alert') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(660, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'powerup') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(300, now); osc.frequency.linearRampToValueAtTime(800, now + 0.4);
+            gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4);
         }
     }
 
+    // --- OYUN DEĞİŞKENLERİ ---
+    let scene, camera, renderer, player, enemy;
+    let obstacles = [], coins = [], shieldItems = [];
+    let gameActive = false, isPaused = false;
+    let score = 0, coinsHeld = 0, multiplier = 1;
+    let lane = 0; 
+    let speed = 0.6; 
+    let stamina = 100, isSprinting = false;
+    
+    let inventory = { freeze: 0, shield: 0 };
+    let shieldActive = false;
+    let shieldTimer = 0;
+    let maxShieldTime = 0; 
+    
+    // Düşman Durumları: 0=Yok, 1=Uyarı(3sn), 2=Kovalıyor(3sn)
+    let enemyState = 0; 
+    let enemyCooldown = 300; 
+    let preChaseTimer = 0; 
+    let survivalTimer = 0; 
+
+    // Verileri Yükle
+    coinsHeld = parseInt(localStorage.getItem('gk_coins') || 0);
+    multiplier = parseInt(localStorage.getItem('gk_mult') || 1);
+    inventory = JSON.parse(localStorage.getItem('gk_inv') || '{"freeze":0,"shield":0}');
+    updateUI();
+
+    // --- THREE.JS BAŞLATMA ---
     function init() {
-        if (renderer) return;
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020205);
-        scene.fog = new THREE.Fog(0x020205, 10, 75);
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 4, 10);
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        scene.background = new THREE.Color(0x050505);
+        scene.fog = new THREE.Fog(0x050505, 10, 60);
+
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
+        camera.position.set(0, 3.5, 7); // Kamera konumu
+        camera.lookAt(0, 0, -5);
+
+        renderer = new THREE.WebGLRenderer({antialias:true});
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        scene.add(new THREE.GridHelper(200, 40, 0x00d2ff, 0x222222));
 
-        player = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0x00d2ff }));
-        player.position.y = 0.5;
+        // Işıklar
+        const amb = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(amb);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.5);
+        dir.position.set(5, 10, 5);
+        scene.add(dir);
+
+        // Zemin (Neon Izgara)
+        const grid = new THREE.GridHelper(200, 50, 0x00d2ff, 0x220033);
+        grid.position.y = -0.5;
+        scene.add(grid);
+
+        // OYUNCU (Turuncu Voxel Kedi)
+        player = createVoxelCat(0xff8800, false); 
         scene.add(player);
 
-        shieldOrb = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 24), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.5 }));
-        shieldOrb.visible = false;
-        player.add(shieldOrb);
+        // DÜŞMAN (Siyah Voxel Kedi - Başta gizli)
+        enemy = createVoxelCat(0x111111, true);
+        enemy.position.z = 20; 
+        enemy.visible = false;
+        scene.add(enemy);
 
-        kediGrup = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2), new THREE.MeshPhongMaterial({ color: 0x111111 }));
-        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        eye.position.set(0.7, 0.6, 1.0); const eye2 = eye.clone(); eye2.position.x = -0.7;
-        kediGrup.add(body, eye, eye2);
-        kediGrup.visible = false;
-        scene.add(kediGrup);
-
-        window.addEventListener('keydown', (e) => {
-            if (e.key === "Escape") togglePause();
-            if (!gameActive || isPaused) return;
-            if (e.key === "a" || e.key === "ArrowLeft") moveLeft();
-            if (e.key === "d" || e.key === "ArrowRight") moveRight();
-            if (e.key === "Shift") startSprint();
-        });
-        window.addEventListener('keyup', (e) => { if (e.key === "Shift") stopSprint(); });
+        animate();
     }
 
-    function activateShield() {
-        isShielded = true;
-        shieldTimeLeft = SHIELD_DURATION;
-        shieldOrb.visible = true;
-        document.getElementById('shield-ui').style.display = 'block';
+    // --- VOXEL KEDİ MODELİ OLUŞTURUCU ---
+    function createVoxelCat(color, isEnemy) {
+        const grp = new THREE.Group();
+        const mat = new THREE.MeshPhongMaterial({color: color, flatShading: true});
+        // Gövde ve Kafa
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1.2), mat); body.position.y = 0.3; grp.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), mat); head.position.set(0, 0.8, -0.6); grp.add(head);
+        // Gözler (Düşman kırmızı, oyuncu siyah)
+        const eyeColor = isEnemy ? 0xff0000 : 0x000000;
+        const eyeMat = new THREE.MeshBasicMaterial({color: eyeColor});
+        const lEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), eyeMat); lEye.position.set(-0.2, 0.9, -0.96); grp.add(lEye);
+        const rEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), eyeMat); rEye.position.set(0.2, 0.9, -0.96); grp.add(rEye);
+        // Kulaklar ve Kuyruk
+        const lEar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), mat); lEar.position.set(-0.25, 1.2, -0.6); grp.add(lEar);
+        const rEar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), mat); rEar.position.set(0.25, 1.2, -0.6); grp.add(rEar);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.8), mat); tail.position.set(0, 0.5, 0.8); tail.rotation.x = 0.3; grp.add(tail);
+        return grp;
     }
 
-    function startGame(selectedDiff) {
-        init();
-        difficulty = selectedDiff;
-        isPaused = false;
-        if (difficulty === 'easy') { baseSpeed = 0.35; spawnRate = 1200; obstacleChance = 0.4; }
-        else if (difficulty === 'medium') { baseSpeed = 0.55; spawnRate = 800; obstacleChance = 0.65; }
-        else if (difficulty === 'hard') { baseSpeed = 0.85; spawnRate = 500; obstacleChance = 0.85; }
-
-        document.getElementById('start-screen').style.display = 'none';
-        document.getElementById('game-over-screen').style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        document.getElementById('mobile-controls').style.display = 'flex';
-        document.getElementById('pause-btn').style.display = 'block';
-        
-        score = 0; stamina = 100; shieldTimeLeft = 0; isShielded = false;
-        gameActive = true; kediActive = false; kediGrup.visible = false; shieldOrb.visible = false;
-        
-        spawn(); animate(); scheduleNextCat(); 
-    }
-
+    // --- OYUN DÖNGÜSÜ (ANIMATE) ---
     function animate() {
-        if (!gameActive || isPaused) return;
-        animationId = requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
+        if(!gameActive || isPaused) return;
 
-        camera.position.x += (player.position.x - camera.position.x) * 0.1;
-        camera.lookAt(player.position.x, 1, player.position.z - 5);
+        // Puan Artışı (Saniyede 100)
+        score += (100 * multiplier) / 60;
+        document.getElementById('score-box').innerText = Math.floor(score);
 
-        let currentSpeed = baseSpeed;
+        // --- DÜŞMAN YAPAY ZEKASI ---
+        if (enemyState === 0) {
+            // Bekleme Modu
+            enemyCooldown--;
+            if (enemyCooldown <= 0 && Math.random() < 0.01) {
+                enemyState = 1; preChaseTimer = 180; // 3 Saniye uyarı başlar
+                document.getElementById('pre-chase-warning').style.display = 'block';
+                playSound('alert');
+            }
+        } else if (enemyState === 1) {
+            // Uyarı Modu (3...2...1...)
+            preChaseTimer--;
+            document.getElementById('pre-timer').innerText = (preChaseTimer / 60).toFixed(1);
+            if (preChaseTimer % 30 === 0) playSound('alert');
+            if (preChaseTimer <= 0) {
+                enemyState = 2; document.getElementById('pre-chase-warning').style.display = 'none'; startChase();
+            }
+        } else if (enemyState === 2) {
+            // Kovalama Modu
+            const alertBox = document.getElementById('chase-alert');
+            alertBox.style.display = 'block';
+            // Düşman yatayda bizi takip eder
+            enemy.position.x += (player.position.x - enemy.position.x) * 0.1;
+            enemy.position.y = 0.3 + Math.sin(Date.now() * 0.04) * 0.1;
 
-        // Stamina/Depar
-        if (isSprinting && stamina > 0) {
-            currentSpeed = baseSpeed * 1.5; stamina -= 0.16;
-            if (kediActive) chaseTimeNeeded -= 0.016; 
+            if (isSprinting && stamina > 0) {
+                // Koşuyorsak: Güvendeyiz, sayaç düşer
+                survivalTimer--;
+                document.getElementById('survival-timer').innerText = (survivalTimer / 60).toFixed(1);
+                alertBox.className = 'alert-safe';
+                enemy.position.z += (5 - enemy.position.z) * 0.05; // Düşman geride kalır
+                if (survivalTimer <= 0) endChase(true); // Kurtulduk
+            } else {
+                // Durursak: Tehlike!
+                alertBox.className = 'alert-danger';
+                document.getElementById('survival-timer').innerText = "YAKALANIYORSUN!";
+                enemy.position.z += (0.5 - enemy.position.z) * 0.1; // Hızla yaklaşır
+                if (enemy.position.z < 0.8 && !shieldActive) gameOver(); // Yakaladı
+            }
+        }
+
+        // --- OYUNCU HAREKETİ & STAMINA ---
+        let currentSpeed = speed;
+        if(isSprinting && stamina > 0) {
+            currentSpeed *= 1.8; stamina -= 0.15; // 10 saniyelik depar
         } else {
-            if (stamina < 100) stamina += 0.1;
-            isSprinting = false;
+            if(stamina < 100) stamina += 0.2; // Stamina dolumu
         }
-        document.getElementById('stamina-bar').style.width = stamina + "%";
+        if(stamina <= 0) isSprinting = false;
+        document.getElementById('stamina-fill').style.width = stamina + "%";
 
-        // Kalkan Barı Güncelleme
-        if (isShielded) {
-            shieldTimeLeft -= 0.016; // Yaklaşık saniyede 1 düşer (60fps)
-            document.getElementById('shield-bar').style.width = (shieldTimeLeft / SHIELD_DURATION * 100) + "%";
-            shieldOrb.rotation.y += 0.05;
-            
-            if (shieldTimeLeft <= 0) {
-                isShielded = false;
-                shieldOrb.visible = false;
-                document.getElementById('shield-ui').style.display = 'none';
-            }
+        // Şerit değiştirme yumuşatma
+        player.position.x += (lane - player.position.x) * 0.15;
+        // Koşma zıplama efekti
+        player.position.y = 0.3 + Math.sin(Date.now() * 0.02) * 0.1;
+
+        // --- KALKAN SÜRESİ ---
+        if(shieldTimer > 0) {
+            shieldTimer--;
+            let percent = (shieldTimer / maxShieldTime) * 100;
+            document.getElementById('shield-fill').style.width = percent + "%";
+            if(shieldTimer <= 0) deactivateShield();
         }
 
-        // Kedi Mantığı
-        if (kediActive) {
-            document.getElementById('status-msg').innerText = "DEPAR: " + Math.max(0, chaseTimeNeeded).toFixed(1) + "s";
-            kediGrup.position.x += (player.position.x - kediGrup.position.x) * 0.1;
+        // --- OBJE YÖNETİMİ ---
+        if(Math.random() < 0.03) spawnObj();
 
-            if (isSprinting) kediGrup.position.z += 0.2; 
-            else kediGrup.position.z -= 0.035; 
-
-            if (kediGrup.position.z > 20) kediGrup.position.z = 20;
-
-            if (chaseTimeNeeded <= 0) {
-                kediActive = false; kediGrup.visible = false;
-                document.getElementById('status-msg').innerText = "KURTULDUN!";
-                setTimeout(() => { if(gameActive) document.getElementById('status-msg').innerText = ""; }, 2000);
-                scheduleNextCat(); 
-            }
-
-            // ÇARPIŞMA: Eğer kalkan yoksa öl, kalkan varsa kedi seni öldüremez
-            if (kediGrup.position.z < 1.2) {
-                if (!isShielded) {
-                    gameOver("KEDİ YAKALADI!");
-                } else {
-                    // Kalkan varken kedi itilsin ki iç içe geçmesin
-                    kediGrup.position.z = 3.0; 
+        [obstacles, coins, shieldItems].forEach((arr, idx) => {
+            for(let i=arr.length-1; i>=0; i--) {
+                arr[i].position.z += currentSpeed; // Bize doğru gelirler
+                
+                // Çarpışma Kontrolü
+                if(Math.abs(arr[i].position.z - player.position.z) < 0.8 && Math.abs(arr[i].position.x - player.position.x) < 0.8) {
+                    if(idx === 0) { // Engel
+                        if(shieldActive) { 
+                            scene.remove(arr[i]); arr.splice(i, 1); playSound('hit'); // Kalkanla kır
+                        } else { gameOver(); }
+                    } else if (idx === 1) { // Coin
+                        coinsHeld += 10; updateUI(); saveData(); scene.remove(arr[i]); arr.splice(i, 1); playSound('coin');
+                    } else if (idx === 2) { // Kalkan İtemi
+                        activateShield(5); scene.remove(arr[i]); arr.splice(i, 1); playSound('powerup');
+                    }
+                } else if(arr[i].position.z > 5) {
+                    scene.remove(arr[i]); arr.splice(i, 1); // Ekrandan çıkanları sil
                 }
-            }
-        }
-
-        // Objeler
-        [obstacles, books, shields].forEach((arr, type) => {
-            for (let i = arr.length - 1; i >= 0; i--) {
-                arr[i].position.z += currentSpeed;
-                if (Math.abs(arr[i].position.z - player.position.z) < 0.8 && Math.abs(arr[i].position.x - player.position.x) < 0.8) {
-                    if (type === 0) { // Engel
-                        if (!isShielded) gameOver("ENGELE ÇARPTIN!"); 
-                        else { scene.remove(arr[i]); arr.splice(i, 1); } // Kalkan engeli yok eder
-                    } 
-                    else if (type === 1) { score += 100; scene.remove(arr[i]); arr.splice(i, 1); } 
-                    else if (type === 2) { activateShield(); scene.remove(arr[i]); arr.splice(i, 1); } 
-                } 
-                else if (arr[i].position.z > 15) { scene.remove(arr[i]); arr.splice(i, 1); }
+                // Coin ve Kalkan dönsün
+                if(idx>0 && arr[i]) arr[i].rotation.y += 0.05;
             }
         });
 
-        document.getElementById('score-val').innerText = score;
         renderer.render(scene, camera);
     }
 
-    function scheduleNextCat() {
-        if (!gameActive) return;
-        catTimeout = setTimeout(() => {
-            if (gameActive && !isPaused) {
-                document.getElementById('status-msg').innerText = "KEDİ ARKANDA!";
-                setTimeout(() => { if(gameActive && !isPaused) activateKedi(); }, 1500);
-            } else if (isPaused) scheduleNextCat();
-        }, Math.random() * 15000 + 10000);
-    }
+    // --- YARDIMCI FONKSİYONLAR ---
+    function startGame(diff) {
+        initAudio(); // Ses başlat
+        if(diff === 'easy') { speed = 0.4; enemyCooldown = 400; }
+        if(diff === 'medium') { speed = 0.6; enemyCooldown = 300; }
+        if(diff === 'hard') { speed = 0.8; enemyCooldown = 200; }
 
-    function activateKedi() { kediActive = true; chaseTimeNeeded = 3.0; kediGrup.visible = true; kediGrup.position.set(player.position.x, 0, 8); }
-
-    function spawn() {
-        if (!gameActive || isPaused) return;
-        let lane = (Math.floor(Math.random() * 3) - 1) * 2;
-        let r = Math.random();
-        if (r > (1.0 - obstacleChance)) { 
-            let obs = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1), new THREE.MeshPhongMaterial({ color: 0xff0055 }));
-            obs.position.set(lane, 0.5, -60); scene.add(obs); obstacles.push(obs);
-        } else if (r > 0.15) { 
-            let b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshPhongMaterial({ color: 0xf1c40f }));
-            b.position.set(lane, 0.5, -60); scene.add(b); books.push(b);
-        } else {
-            let s = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x00ffff }));
-            s.position.set(lane, 0.6, -60); scene.add(s); shields.push(s);
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('ui-layer').style.display = 'block';
+        document.getElementById('pause-btn').style.display = 'block';
+        // Mobildeyse tuşları göster
+        if('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            document.getElementById('mobile-controls').style.display = 'flex';
         }
-        spawnTimer = setTimeout(spawn, spawnRate);
+        gameActive = true;
     }
 
-    function gameOver(reason) {
-        gameActive = false; cancelAnimationFrame(animationId); clearTimeout(spawnTimer); clearTimeout(catTimeout);
-        document.getElementById('ui').style.display = 'none'; document.getElementById('mobile-controls').style.display = 'none';
-        document.getElementById('pause-btn').style.display = 'none'; document.getElementById('game-over-screen').style.display = 'flex';
-        document.getElementById('death-reason').innerText = reason;
+    function startChase() {
+        enemy.visible = true; enemy.position.z = 8; enemy.position.x = player.position.x;
+        survivalTimer = 180; // 3 saniye kaçış süresi
     }
 
-    function resetGame() {
-        [obstacles, books, shields].forEach(arr => { arr.forEach(obj => scene.remove(obj)); });
-        obstacles = []; books = []; shields = [];
-        document.getElementById('game-over-screen').style.display = 'none';
-        document.getElementById('start-screen').style.display = 'flex';
-        document.getElementById('status-msg').innerText = "";
+    function endChase(success) {
+        enemyState = 0; enemy.visible = false; enemy.position.z = 20;
+        enemyCooldown = 300; document.getElementById('chase-alert').style.display = 'none';
     }
+
+    function spawnObj() {
+        let l = (Math.floor(Math.random()*3)-1)*2; // Şerit seçimi (-2, 0, 2)
+        let rand = Math.random();
+        if(rand < 0.6) { // %60 Engel (Kırmızı Küp)
+            const geo = new THREE.BoxGeometry(1, 1, 1); const mat = new THREE.MeshPhongMaterial({color: 0xff0044, emissive: 0x440000});
+            const obs = new THREE.Mesh(geo, mat); obs.position.set(l, 0.5, -60); scene.add(obs); obstacles.push(obs);
+        } else if (rand < 0.95) { // %35 Coin (Sarı Silindir)
+            const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 10); const mat = new THREE.MeshBasicMaterial({color: 0xffd700});
+            const coin = new THREE.Mesh(geo, mat); coin.position.set(l, 0.8, -60); coin.rotation.z = Math.PI/2; scene.add(coin); coins.push(coin);
+        } else { // %5 Kalkan (Mavi İkozahedron)
+            const geo = new THREE.IcosahedronGeometry(0.4, 0); const mat = new THREE.MeshPhongMaterial({color: 0x0088ff, emissive: 0x00ffff});
+            const shield = new THREE.Mesh(geo, mat); shield.position.set(l, 0.8, -60); scene.add(shield); shieldItems.push(shield);
+        }
+    }
+
+    function activateShield(seconds) {
+        shieldActive = true; maxShieldTime = seconds * 60; shieldTimer = maxShieldTime;
+        player.children.forEach(c => c.material.emissive.setHex(0x00ffff)); // Mavi parla
+        document.getElementById('shield-bar').style.display = 'block';
+        document.getElementById('shield-text').style.display = 'block';
+    }
+
+    function deactivateShield() {
+        shieldActive = false;
+        player.children.forEach(c => c.material.emissive.setHex(0x000000)); // Parlamayı kapat
+        document.getElementById('shield-bar').style.display = 'none';
+        document.getElementById('shield-text').style.display = 'none';
+    }
+
+    function buy(type) {
+        let cost = (type==='mult')?500 : (type==='freeze'?200:1000);
+        if(coinsHeld >= cost) {
+            coinsHeld -= cost; if(type === 'mult') multiplier++; else inventory[type]++;
+            saveData(); playSound('powerup');
+        } else alert("Yetersiz Coin");
+    }
+
+    function useItem(type) {
+        if(inventory[type] > 0) {
+            inventory[type]--; saveData();
+            if(type === 'freeze') { 
+                if(enemyState === 2) { endChase(true); playSound('powerup'); } 
+                else { alert("Kedi yok!"); inventory[type]++; }
+            }
+            if(type === 'shield') { activateShield(600); playSound('powerup'); }
+        }
+    }
+
+    function hardReload() { window.location.href = window.location.href; }
+    function togglePause() { if(!gameActive) return; isPaused = !isPaused; document.getElementById('pause-screen').style.display = isPaused ? 'flex' : 'none'; }
+    function openShop() { document.getElementById('shop-screen').style.display = 'flex'; }
+    function closeShop() { document.getElementById('shop-screen').style.display = 'none'; }
+    function move(dir) { if(!isPaused) lane = Math.max(-2, Math.min(2, lane + dir*2)); }
+    function saveData() { localStorage.setItem('gk_coins', coinsHeld); localStorage.setItem('gk_mult', multiplier); localStorage.setItem('gk_inv', JSON.stringify(inventory)); updateUI(); }
+    function updateUI() { 
+        document.getElementById('coin-display').innerText = coinsHeld; document.getElementById('menu-coin').innerText = coinsHeld;
+        document.getElementById('shop-coin').innerText = coinsHeld; document.getElementById('badge-freeze').innerText = inventory.freeze;
+        document.getElementById('badge-shield').innerText = inventory.shield;
+    }
+    
+    function gameOver() {
+        playSound('hit'); gameActive = false;
+        document.getElementById('game-over').style.display = 'flex';
+        document.getElementById('final-score').innerText = "SKOR: " + Math.floor(score);
+        document.getElementById('mobile-controls').style.display = 'none';
+        document.getElementById('pause-btn').style.display = 'none';
+        document.getElementById('chase-alert').style.display = 'none';
+        document.getElementById('pre-chase-warning').style.display = 'none';
+    }
+
+    // --- KONTROLLER (Klavye ve Dokunmatik) ---
+    window.onkeydown = (e) => {
+        if(e.key === 'ArrowLeft' || e.key === 'a') move(-1);
+        if(e.key === 'ArrowRight' || e.key === 'd') move(1);
+        if(e.key === 'Shift') isSprinting = true;
+        if(e.key === 'z') useItem('freeze');
+        if(e.key === 'x') useItem('shield');
+        if(e.key === 'Escape') togglePause();
+    };
+    window.onkeyup = (e) => { if(e.key === 'Shift') isSprinting = false; };
+
+    const sb = document.getElementById('sprint-btn');
+    sb.addEventListener('touchstart', (e) => { e.preventDefault(); isSprinting = true; });
+    sb.addEventListener('touchend', (e) => { e.preventDefault(); isSprinting = false; });
+    document.getElementById('m-left').addEventListener('touchstart', (e) => { e.preventDefault(); move(-1); });
+    document.getElementById('m-right').addEventListener('touchstart', (e) => { e.preventDefault(); move(1); });
+
+    // Oyunu Başlat
+    init();
 </script>
 </body>
-</html>
+</html>   
