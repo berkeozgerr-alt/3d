@@ -54,6 +54,8 @@
         .btn:active { transform: scale(0.95); }
 
         #pause-btn { position: fixed; top: 20px; left: 20px; padding: 10px 20px; background: rgba(255,255,255,0.2); border: 2px solid white; color: white; border-radius: 5px; cursor: pointer; pointer-events: auto; z-index: 150; display: none; font-weight: bold; }
+        
+        .tutorial-list { font-size: 18px; line-height: 2; text-align: left; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -91,7 +93,40 @@
 
 <div id="pause-btn" onclick="togglePause()">DURDUR</div>
 
-<div id="start-screen" class="overlay">
+<!-- 1. CİHAZ SEÇİM EKRANI -->
+<div id="device-screen" class="overlay">
+    <h1 style="color: #00d2ff; font-size: 40px; text-shadow: 0 0 10px cyan;">CİHAZINI SEÇ</h1>
+    <p style="margin-bottom: 30px; font-size: 18px; color: #ccc;">Nasıl oynayacağını öğrenmek için cihazını seç:</p>
+    <button class="btn" style="background: #3498db;" onclick="selectDevice('pc')">BİLGİSAYAR (PC)</button>
+    <button class="btn" style="background: #e67e22;" onclick="selectDevice('mobile')">MOBİL (TELEFON/TABLET)</button>
+</div>
+
+<!-- 2. PC EĞİTİM EKRANI -->
+<div id="tutorial-pc" class="overlay" style="display: none;">
+    <h1 style="color: #3498db;">PC KONTROLLERİ</h1>
+    <ul class="tutorial-list">
+        <li><b>A / D</b> veya <b>Sağ/Sol Ok:</b> Şerit değiştir</li>
+        <li><b>Shift Tuşu:</b> Depar at (Kedi kovalarken kullan!)</li>
+        <li><b>Z Tuşu:</b> Dondurucu Gücünü Kullan</li>
+        <li><b>X Tuşu:</b> Kalkan Gücünü Kullan</li>
+        <li><b>ESC:</b> Oyunu Duraklat</li>
+    </ul>
+    <button class="btn" style="background: #27ae60;" onclick="finishTutorial()">ANLADIM, BAŞLA!</button>
+</div>
+
+<!-- 3. MOBİL EĞİTİM EKRANI -->
+<div id="tutorial-mobile" class="overlay" style="display: none;">
+    <h1 style="color: #e67e22;">MOBİL KONTROLLERİ</h1>
+    <ul class="tutorial-list">
+        <li><b>Sol Alttaki Oklar (← / →):</b> Şerit değiştir</li>
+        <li><b>Sağ Alttaki DEPAR:</b> Hızlı koş (Kedi kovalarken kullan!)</li>
+        <li><b>Sağ Üstteki İkonlar:</b> Dondurucu ve Kalkan Güçleri</li>
+    </ul>
+    <button class="btn" style="background: #27ae60;" onclick="finishTutorial()">ANLADIM, BAŞLA!</button>
+</div>
+
+<!-- 4. ANA MENÜ -->
+<div id="start-screen" class="overlay" style="display: none;">
     <h1 style="color: #00d2ff; font-size: 45px; text-shadow: 0 0 10px cyan;">KEDİDEN KAÇ 3D</h1>
     <p>Coin: <span id="menu-coin">0</span></p>
     <p style="font-size:12px; color:#aaa;">(Ses için ekrana tıklayın)</p>
@@ -160,6 +195,41 @@
             osc.start(now); osc.stop(now + 0.4);
         }
     }
+
+    // --- EĞİTİM (TUTORIAL) EKRANLARI YÖNETİMİ ---
+    let forceMobileControls = false;
+
+    // Sayfa yüklendiğinde daha önce cihaz seçilmiş mi kontrol et
+    function checkDevicePreference() {
+        let savedDevice = localStorage.getItem('gk_device');
+        if (savedDevice) {
+            document.getElementById('device-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            forceMobileControls = (savedDevice === 'mobile');
+        }
+    }
+
+    function selectDevice(type) {
+        localStorage.setItem('gk_device', type); // Seçimi kaydet
+        document.getElementById('device-screen').style.display = 'none';
+        if (type === 'pc') {
+            document.getElementById('tutorial-pc').style.display = 'flex';
+            forceMobileControls = false;
+        } else if (type === 'mobile') {
+            document.getElementById('tutorial-mobile').style.display = 'flex';
+            forceMobileControls = true; // Mobili seçtiği için dokunmatik butonları zorunlu açacağız
+        }
+    }
+
+    function finishTutorial() {
+        document.getElementById('tutorial-pc').style.display = 'none';
+        document.getElementById('tutorial-mobile').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+    }
+
+    // Başlangıçta kontrolü çalıştır
+    checkDevicePreference();
+
 
     // --- OYUN DEĞİŞKENLERİ ---
     let scene, camera, renderer, player, enemy;
@@ -357,8 +427,9 @@
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('ui-layer').style.display = 'block';
         document.getElementById('pause-btn').style.display = 'block';
-        // Mobildeyse tuşları göster
-        if('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        
+        // Cihaz seçimine göre veya dokunmatik ekran donanımına göre tuşları göster
+        if(forceMobileControls || 'ontouchstart' in window || navigator.maxTouchPoints > 0) {
             document.getElementById('mobile-controls').style.display = 'flex';
         }
         gameActive = true;
